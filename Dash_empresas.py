@@ -58,7 +58,7 @@ try:
     df = load_data()
     
     # --- BUSCADOR Y FILTROS SUPERIORES ---
-    st.markdown("<h1 style='text-align: center; color: white;'>🚔 Sala de Situación - Causa 4879</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: white;'>🚔 Resumen - Causa 4879</h1>", unsafe_allow_html=True)
     
     col_search, col_status = st.columns([2, 1])
     with col_search:
