@@ -14,26 +14,30 @@ st.markdown("""
     .investigado-card {
         background-color: #162636;
         border-radius: 10px;
-        padding: 15px;
+        padding: 12px;
         margin-bottom: 15px;
-        height: 320px;
+        height: 300px;
         border-top: 5px solid #3498db;
         box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
     }
     .card-verde { border-top: 5px solid #2ecc71; }
     .card-amarillo { border-top: 5px solid #f1c40f; }
     .card-rojo { border-top: 5px solid #e74c3c; }
     
-    .card-title { font-size: 1.1rem; font-weight: bold; color: #ffffff; margin-bottom: 5px; }
-    .card-sub { font-size: 0.85rem; color: #3498db; margin-bottom: 10px; font-weight: bold; }
-    .card-info { font-size: 0.85rem; line-height: 1.3; margin-bottom: 8px; }
+    .card-title { font-size: 1rem; font-weight: bold; color: #ffffff; margin-bottom: 2px; }
+    .card-sub { font-size: 0.8rem; color: #3498db; margin-bottom: 8px; font-weight: bold; text-transform: uppercase; }
+    .card-info { font-size: 0.8rem; line-height: 1.2; margin-bottom: 5px; }
     .card-res { 
-        background: rgba(0,0,0,0.2); 
+        background: rgba(0,0,0,0.3); 
         padding: 8px; 
         border-radius: 5px; 
-        font-size: 0.8rem; 
+        font-size: 0.75rem; 
         font-style: italic; 
         border-left: 2px solid #3498db;
+        overflow-y: auto;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -44,6 +48,10 @@ def load_data():
     df = pd.read_csv('data.csv', sep=None, engine='python', encoding='utf-8')
     df['latitude'] = pd.to_numeric(df['latitude'], errors='coerce')
     df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce')
+    # Asegurar que no haya valores nulos en columnas de búsqueda
+    df['empresa'] = df['empresa'].fillna('')
+    df['sujeto'] = df['sujeto'].fillna('')
+    df['cuit'] = df['cuit'].fillna('')
     return df
 
 try:
@@ -54,15 +62,15 @@ try:
     
     col_search, col_status = st.columns([2, 1])
     with col_search:
-        query = st.text_input("🔍 Buscador de Objetivos (Nombre, CUIT, Empresa o DNI):", "").lower()
+        query = st.text_input("🔍 Buscador (Nombre, CUIT, Empresa o DNI):", "").lower()
     with col_status:
         status_filtro = st.multiselect("Filtrar Semáforo:", ["Verde", "Amarillo", "Rojo"], default=["Verde", "Amarillo", "Rojo"])
 
-    # Aplicar filtros
+    # Lógica de filtrado corregida
     mask = (
-        (df['empresa'].str.lower().contains(query) | 
-         df['sujeto'].str.lower().contains(query) | 
-         df['cuit'].astype(str).str.contains(query)) &
+        (df['empresa'].str.contains(query, case=False, na=False) | 
+         df['sujeto'].str.contains(query, case=False, na=False) | 
+         df['cuit'].astype(str).str.contains(query, na=False)) &
         (df['status'].isin(status_filtro))
     )
     df_filtrado = df[mask]
@@ -74,7 +82,7 @@ try:
     m3.metric("Pendientes", len(df_filtrado[df_filtrado['status'] == 'Amarillo']))
     m4.metric("Sin Datos/Neg", len(df_filtrado[df_filtrado['status'] == 'Rojo']))
 
-    # --- PESTAÑAS (TABS) ---
+    # --- PESTAÑAS ---
     tab_mapa, tab_cuadrados = st.tabs(["📍 MAPA OPERATIVO", "📇 ÍNDICE DE OBJETIVOS"])
 
     with tab_mapa:
@@ -89,23 +97,26 @@ try:
             st.warning("No hay coordenadas para los filtros seleccionados.")
 
     with tab_cuadrados:
-        # Generar Grilla de Cuadrados (Cards)
-        columnas_grilla = st.columns(3) # 3 columnas para la TV de 55"
+        # Grilla de 4 columnas para máxima condensación de data
+        n_cols = 4
+        columnas_grilla = st.columns(n_cols)
         
         for i, (idx, row) in enumerate(df_filtrado.iterrows()):
-            with columnas_grilla[i % 3]:
+            with columnas_grilla[i % n_cols]:
                 card_class = f"card-{row['status'].lower()}"
                 st.markdown(f"""
                 <div class="investigado-card {card_class}">
-                    <div class="card-title">{row['sujeto'][:40]}</div>
-                    <div class="card-sub">{row['empresa']}</div>
-                    <div class="card-info">
-                        <b>📍 Dom:</b> {row['domicilio'][:60]}...<br>
-                        <b>📞 Tel:</b> {row['telefonos']}<br>
-                        <b>🌐 Redes:</b> {row['redes_sociales']}
+                    <div>
+                        <div class="card-title">{row['sujeto'][:45]}</div>
+                        <div class="card-sub">{row['empresa'][:30]}</div>
+                        <div class="card-info">
+                            <b>📍 Dom:</b> {row['domicilio'][:55]}...<br>
+                            <b>📞 Tel:</b> {row['telefonos']}<br>
+                            <b>🌐 Redes:</b> {row['redes_sociales']}
+                        </div>
                     </div>
                     <div class="card-res">
-                        <b>Informe:</b> {row['resultado'][:120]}...
+                        <b>Informe:</b> {row['resultado'][:110]}...
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
