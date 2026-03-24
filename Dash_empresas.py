@@ -13,7 +13,7 @@ def login():
         with col2:
             clave = st.text_input("Clave de la Causa 4879:", type="password")
             if st.button("Acceder"):
-                if clave == "brigada4879": # CLAVE MANUAL
+                if clave == "Dicco1272": # CLAVE MANUAL
                     st.session_state["autenticado"] = True
                     st.rerun()
                 else:
