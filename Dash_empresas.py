@@ -3,62 +3,73 @@ import pandas as pd
 import folium
 from streamlit_folium import folium_static
 
-# 1. CONFIGURACIÓN DE SEGURIDAD (Clave manual)
-def check_password():
-    """Devuelve True si el usuario ingresó la clave correcta."""
-    if "password_correct" not in st.session_state:
-        st.session_state["password_correct"] = False
-
-    if not st.session_state["password_correct"]:
-        # Pantalla de Login
+# 1. SEGURIDAD DE ACCESO
+def login():
+    if "autenticado" not in st.session_state:
+        st.session_state["autenticado"] = False
+    if not st.session_state["autenticado"]:
         st.markdown("<h2 style='text-align: center; color: white;'>🚔 Sistema de Inteligencia PFA</h2>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center;'>Ingrese la clave de acceso de la Causa 4879</p>", unsafe_allow_html=True)
-        
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            password = st.text_input("Contraseña:", type="password")
+            clave = st.text_input("Clave de la Causa 4879:", type="password")
             if st.button("Acceder"):
-                # DEFINÍ TU CLAVE ACÁ (Cambiá 'brigada4879' por lo que quieras)
-                if password == "Dicco1272": 
-                    st.session_state["password_correct"] = True
+                if clave == "brigada4879": # CLAVE MANUAL
+                    st.session_state["autenticado"] = True
                     st.rerun()
                 else:
-                    st.error("⚠️ Clave incorrecta. Acceso denegado.")
+                    st.error("⚠️ Clave incorrecta")
         return False
     return True
 
-# Solo si la clave es correcta, se ejecuta el resto
-if check_password():
-    
-    # 2. CONFIGURACIÓN E INSTITUCIONAL
-    st.set_page_config(page_title="PFA - Monitoreo Causa 4879", layout="wide")
+if login():
+    st.set_page_config(page_title="PFA - Causa 4879", layout="wide")
 
-    # 3. CSS PARA CUADRADOS Y ESTÉTICA
+    # 2. CSS PARA CUADROS POR EMPRESA (Contenedores)
     st.markdown("""
         <style>
         .stApp { background-color: #0b131e; color: #e0e0e0; }
-        .investigado-card {
+        
+        /* Contenedor Principal de la Empresa */
+        .company-card {
             background-color: #162636;
-            border-radius: 10px;
-            padding: 12px;
-            margin-bottom: 15px;
-            height: 300px;
-            border-top: 5px solid #3498db;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid #1a3a5a;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.5);
+            min-height: 400px;
         }
-        .card-verde { border-top: 5px solid #2ecc71; }
-        .card-amarillo { border-top: 5px solid #f1c40f; }
-        .card-rojo { border-top: 5px solid #e74c3c; }
-        .card-title { font-size: 1rem; font-weight: bold; color: #ffffff; }
-        .card-sub { font-size: 0.8rem; color: #3498db; font-weight: bold; text-transform: uppercase; }
-        .card-info { font-size: 0.8rem; line-height: 1.2; margin-top: 5px; }
-        .card-res { 
-            background: rgba(0,0,0,0.3); 
-            padding: 8px; border-radius: 5px; font-size: 0.75rem; 
-            font-style: italic; border-left: 2px solid #3498db;
+        .company-title { 
+            color: #3498db; 
+            font-size: 1.1rem; 
+            font-weight: bold; 
+            border-bottom: 2px solid #3498db;
+            margin-bottom: 12px;
+            padding-bottom: 5px;
+            text-transform: uppercase;
+        }
+        
+        /* Bloque de Persona/Sujeto dentro de la empresa */
+        .subject-block {
+            background: rgba(0,0,0,0.2);
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-left: 4px solid #7f8c8d;
+        }
+        .border-verde { border-left-color: #2ecc71 !important; }
+        .border-amarillo { border-left-color: #f1c40f !important; }
+        .border-rojo { border-left-color: #e74c3c !important; }
+        
+        .subject-name { font-size: 0.9rem; font-weight: bold; color: #ffffff; }
+        .subject-data { font-size: 0.8rem; line-height: 1.2; color: #adb5bd; margin-top: 4px; }
+        .subject-report { 
+            font-size: 0.75rem; 
+            font-style: italic; 
+            color: #3498db; 
+            margin-top: 6px; 
+            border-top: 1px solid #2c3e50;
+            padding-top: 4px;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -72,55 +83,77 @@ if check_password():
 
     try:
         df = load_data()
-        
-        # --- BUSCADOR Y FILTROS ---
-        st.markdown("<h1 style='text-align: center;'>🚨 Monitor Táctico - Causa 4879</h1>", unsafe_allow_html=True)
-        
-        query = st.text_input("🔍 Buscador (Nombre, CUIT, Empresa o DNI):", "").lower()
-        status_filtro = st.multiselect("Filtrar Semáforo:", ["Verde", "Amarillo", "Rojo"], default=["Verde", "Amarillo", "Rojo"])
+        st.markdown("<h1 style='text-align: center;'>🚨 Monitor de Empresas - Causa 4879</h1>", unsafe_allow_html=True)
 
-        mask = (
-            (df['empresa'].str.contains(query, case=False, na=False) | 
-             df['sujeto'].str.contains(query, case=False, na=False) | 
-             df['cuit'].astype(str).str.contains(query, na=False)) &
-            (df['status'].isin(status_filtro))
-        )
-        df_filtrado = df[mask]
+        # 3. FILTROS
+        col_a, col_b = st.columns([3, 1])
+        with col_a:
+            query = st.text_input("🔍 Buscar por Empresa o Nombre de Investigado:", "").lower()
+        with col_b:
+            status_filtro = st.multiselect("Filtrar por Estado:", ["Verde", "Amarillo", "Rojo"], default=["Verde", "Amarillo", "Rojo"])
 
-        # --- PESTAÑAS ---
-        tab_mapa, tab_cuadrados = st.tabs(["📍 MAPA OPERATIVO", "📇 ÍNDICE EN CUADRADOS"])
+        # Lógica de búsqueda: Si el nombre de la empresa O alguno de sus integrantes coincide
+        df_filtrado = df[df['status'].isin(status_filtro)]
+        if query:
+            # Encontramos todas las empresas que tienen al menos un match
+            empresas_con_match = df_filtrado[
+                df_filtrado['empresa'].str.contains(query, case=False, na=False) | 
+                df_filtrado['sujeto'].str.contains(query, case=False, na=False)
+            ]['empresa'].unique()
+            df_display = df_filtrado[df_filtrado['empresa'].isin(empresas_con_match)]
+        else:
+            df_display = df_filtrado
 
-        with tab_mapa:
-            df_map = df_filtrado.dropna(subset=['latitude', 'longitude'])
+        tab_map, tab_grid = st.tabs(["📍 MAPA DE OBJETIVOS", "🏢 ESTRUCTURA POR EMPRESA"])
+
+        with tab_map:
+            df_map = df_display.dropna(subset=['latitude', 'longitude'])
             if not df_map.empty:
                 m = folium.Map(location=[df_map['latitude'].mean(), df_map['longitude'].mean()], zoom_start=11, tiles="CartoDB dark_matter")
                 for _, row in df_map.iterrows():
                     color = {"Verde": "green", "Amarillo": "orange", "Rojo": "red"}.get(row['status'], "gray")
-                    folium.Marker([row['latitude'], row['longitude']], popup=row['sujeto'], icon=folium.Icon(color=color)).add_to(m)
-                folium_static(m, width=1200, height=500)
+                    folium.Marker([row['latitude'], row['longitude']], popup=f"{row['empresa']}: {row['sujeto']}", icon=folium.Icon(color=color)).add_to(m)
+                folium_static(m, width=1200)
 
-        with tab_cuadrados:
-            n_cols = 4
-            columnas_grilla = st.columns(n_cols)
-            for i, (idx, row) in enumerate(df_filtrado.iterrows()):
-                with columnas_grilla[i % n_cols]:
-                    card_class = f"card-{row['status'].lower()}"
-                    st.markdown(f"""
-                    <div class="investigado-card {card_class}">
-                        <div>
-                            <div class="card-title">{row['sujeto'][:45]}</div>
-                            <div class="card-sub">{row['empresa'][:30]}</div>
-                            <div class="card-info">
-                                <b>📍 Dom:</b> {row['domicilio'][:50]}...<br>
-                                <b>📞 Tel:</b> {row['telefonos']}<br>
-                                <b>🌐 Redes:</b> {row['redes_sociales']}
+        with tab_grid:
+            # Agrupamos por Empresa para generar un recuadro por cada una
+            lista_empresas = df_display['empresa'].unique()
+            
+            # Grilla de 3 columnas (mejor para ver contenido interno de cada cuadro)
+            n_cols = 3
+            cols = st.columns(n_cols)
+            
+            for i, nombre_empresa in enumerate(lista_empresas):
+                with cols[i % n_cols]:
+                    # Datos de la empresa actual
+                    emp_data = df_display[df_display['empresa'] == nombre_empresa]
+                    cuit_emp = emp_data['cuit'].iloc[0]
+                    
+                    # Iniciamos el cuadro de empresa
+                    card_html = f"""
+                    <div class="company-card">
+                        <div class="company-title">{nombre_empresa}</div>
+                        <div style="font-size:0.8rem; color:#7f8c8d; margin-top:-10px; margin-bottom:15px;">CUIT: {cuit_emp}</div>
+                    """
+                    
+                    # Agregamos a cada persona dentro de esta empresa
+                    for _, row in emp_data.iterrows():
+                        color_class = f"border-{row['status'].lower()}"
+                        card_html += f"""
+                        <div class="subject-block {color_class}">
+                            <div class="subject-name">👤 {row['sujeto']}</div>
+                            <div class="subject-data">
+                                📍 {row['domicilio']}<br>
+                                📞 {row['telefonos']} | 🌐 {row['redes_sociales']}
+                            </div>
+                            <div class="subject-report">
+                                {row['resultado']}
                             </div>
                         </div>
-                        <div class="card-res">
-                            <b>Informe:</b> {row['resultado'][:100]}...
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                        """
+                    
+                    card_html += "</div>"
+                    st.markdown(card_html, unsafe_allow_html=True)
 
     except Exception as e:
-        st.error(f"Error: {e}")
+        st.error(f"Error en carga de datos: {e}")
