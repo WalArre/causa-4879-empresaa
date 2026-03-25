@@ -24,7 +24,7 @@ def login():
 if login():
     st.set_page_config(page_title="PFA - Causa 4879", layout="wide")
 
-    # 2. CSS - ESTÉTICA DE TARJETAS EMPRESARIALES (Sin espacios que rompan markdown)
+    # 2. CSS - ESTÉTICA TÁCTICA
     st.markdown("""
 <style>
 .stApp { background-color: #0b131e; color: #e0e0e0; }
@@ -38,6 +38,7 @@ if login():
 .subject-name { font-size: 0.95rem; font-weight: bold; color: #ffffff; }
 .subject-data { font-size: 0.8rem; line-height: 1.4; color: #adb5bd; margin-top: 5px; }
 .subject-report { font-size: 0.75rem; font-style: italic; color: #3498db; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); }
+.mission-box { background-color: rgba(52, 152, 219, 0.1); border-left: 5px solid #3498db; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -48,11 +49,27 @@ if login():
         df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce')
         return df
 
+    # Función para convertir el dataframe filtrado a CSV compatible con Excel
+    @st.cache_data
+    def convert_df_to_csv(df):
+        # utf-8-sig es vital para que Excel lea los acentos correctamente
+        return df.to_csv(index=False).encode('utf-8-sig')
+
     try:
         df = load_data()
         st.markdown("<h1 style='text-align: center;'>🚨 Monitoreo de Redes Societarias - Causa 4879</h1>", unsafe_allow_html=True)
 
-        # 3. FILTROS
+        # RESUMEN DE LA CAUSA
+        st.markdown("""
+        <div class="mission-box">
+            <h4 style="color: #3498db; margin-top: 0;">📋 Objetivo del Requerimiento</h4>
+            <p style="margin-bottom: 0; font-size: 0.95rem; color: #e0e0e0; line-height: 1.5;">
+                En el marco de la presente investigación, se solicitó a esta Unidad el chequeo exhaustivo de las sociedades comerciales vinculadas a la causa. Las tareas de inteligencia comprenden el <b>desglose y perfilamiento de su personal y directivos</b>, así como la <b>constatación física y compulsa de bases de datos</b> para verificar la veracidad de sus domicilios, medios de contacto y operatividad real en el terreno.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # FILTROS
         q_col, s_col = st.columns([3, 1])
         with q_col:
             query = st.text_input("🔍 Buscador de Empresa, Sujeto o CUIT:", "").lower()
@@ -70,6 +87,17 @@ if login():
         else:
             df_final = df_base
 
+        # BOTÓN DE DESCARGA (Exportar a Excel/CSV)
+        csv_data = convert_df_to_csv(df_final)
+        st.download_button(
+            label="📥 Exportar Resultados Filtrados (Excel)",
+            data=csv_data,
+            file_name='Reporte_Inteligencia_4879.csv',
+            mime='text/csv',
+        )
+        st.markdown("---") # Línea divisoria
+
+        # PESTAÑAS
         tab_m, tab_g = st.tabs(["📍 MAPA OPERATIVO", "🏢 ÍNDICE DE EMPRESAS (22)"])
 
         with tab_m:
@@ -90,7 +118,6 @@ if login():
                     data_emp = df_final[df_final['empresa'] == emp]
                     cuit_label = data_emp['cuit'].iloc[0]
                     
-                    # CONSTRUCCIÓN LINEAL DEL HTML (Sin espacios en blanco para evitar errores)
                     html_content = f"<div class='company-card'>"
                     html_content += f"<div class='header-box'>"
                     html_content += f"<div class='company-title'>{emp}</div>"
