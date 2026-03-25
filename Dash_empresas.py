@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import folium
 from streamlit_folium import folium_static
+from fpdf import FPDF
 
 # 1. SEGURIDAD DE ACCESO
 def login():
@@ -13,7 +14,7 @@ def login():
         with col2:
             clave = st.text_input("Ingrese Clave Operativa:", type="password")
             if st.button("Acceder"):
-                if clave == "Dicco1272": # CLAVE FIJADA
+                if clave == "Dicco1272":
                     st.session_state["autenticado"] = True
                     st.rerun()
                 else:
@@ -24,7 +25,7 @@ def login():
 if login():
     st.set_page_config(page_title="PFA - Causa 4879", layout="wide")
 
-    # 2. CSS - ESTÉTICA TÁCTICA
+    # 2. CSS TÁCTICO
     st.markdown("""
 <style>
 .stApp { background-color: #0b131e; color: #e0e0e0; }
@@ -49,22 +50,78 @@ if login():
         df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce')
         return df
 
-    # Función para convertir el dataframe filtrado a CSV compatible con Excel
-    @st.cache_data
-    def convert_df_to_csv(df):
-        # utf-8-sig es vital para que Excel lea los acentos correctamente
-        return df.to_csv(index=False).encode('utf-8-sig')
+    # --- FUNCIÓN GENERADORA DE PDF EN CUADRITOS ---
+    def generar_pdf(df_filtrado):
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        
+        # Helper para evitar errores con tildes y eñes
+        def cln(texto):
+            return str(texto).encode('latin-1', 'replace').decode('latin-1')
+
+        # Título del Documento
+        pdf.set_font("Arial", 'B', 16)
+        pdf.cell(0, 10, txt=cln("Reporte de Inteligencia - Causa 4879"), ln=True, align='C')
+        pdf.ln(5)
+
+        empresas = df_filtrado['empresa'].unique()
+
+        for emp in empresas:
+            data_emp = df_filtrado[df_filtrado['empresa'] == emp]
+            cuit_label = data_emp['cuit'].iloc[0]
+
+            # Cuadro de la Empresa (Fondo Azul)
+            pdf.set_fill_color(41, 128, 185) # Azul PFA
+            pdf.set_text_color(255, 255, 255)
+            pdf.set_font("Arial", 'B', 11)
+            titulo_empresa = cln(f" EMPRESA: {emp} | CUIT: {cuit_label}")
+            pdf.cell(0, 8, txt=titulo_empresa, ln=True, fill=True)
+
+            pdf.set_text_color(0, 0, 0) # Volver texto a negro
+            
+            # Cuadritos de los Integrantes
+            for _, row in data_emp.iterrows():
+                estado = row['status']
+                # Colores según semáforo
+                if estado == 'Verde':
+                    pdf.set_fill_color(200, 247, 205) # Verde suave
+                elif estado == 'Amarillo':
+                    pdf.set_fill_color(255, 249, 196) # Amarillo suave
+                else:
+                    pdf.set_fill_color(255, 205, 210) # Rojo suave
+
+                # Nombre y Estado
+                pdf.set_font("Arial", 'B', 10)
+                sujeto_str = cln(f" Objetivo: {row['sujeto']} [{estado.upper()}]")
+                pdf.cell(0, 7, txt=sujeto_str, ln=True, fill=True, border=1)
+
+                # Datos (Dom, Tel, Redes)
+                pdf.set_font("Arial", '', 9)
+                info_str = cln(f" Dom: {row['domicilio']} | Tel: {row['telefonos']}\n Redes: {row['redes_sociales']}")
+                pdf.multi_cell(0, 5, txt=info_str, border=1)
+
+                # Reporte Policial
+                pdf.set_font("Arial", 'I', 9)
+                res_str = cln(f" Informe: {row['resultado']}")
+                pdf.multi_cell(0, 5, txt=res_str, border=1)
+                
+                pdf.ln(2) # Espacio entre personas
+            pdf.ln(4) # Espacio entre empresas
+
+        # Devolver el PDF armado en formato bytes
+        return pdf.output(dest='S').encode('latin-1')
+    # -----------------------------------------------
 
     try:
         df = load_data()
         st.markdown("<h1 style='text-align: center;'>🚨 Monitoreo de Redes Societarias - Causa 4879</h1>", unsafe_allow_html=True)
 
-        # RESUMEN DE LA CAUSA
         st.markdown("""
         <div class="mission-box">
             <h4 style="color: #3498db; margin-top: 0;">📋 Objetivo del Requerimiento</h4>
             <p style="margin-bottom: 0; font-size: 0.95rem; color: #e0e0e0; line-height: 1.5;">
-                En el marco de la presente investigación, se solicitó a esta Unidad el chequeo exhaustivo de las sociedades comerciales vinculadas a la causa. Las tareas de inteligencia comprenden el <b>desglose y perfilamiento de su personal y directivos</b>, así como la <b>constatación física y compulsa de bases de datos</b> para verificar la veracidad de sus domicilios, medios de contacto y operatividad real en el terreno.
+                En el marco de la presente investigación, se solicitó a esta Unidad el chequeo exhaustivo de las sociedades comerciales vinculadas a la causa. Las tareas comprenden el <b>desglose de personal y directivos</b>, y la <b>constatación física y compulsa de bases</b> para verificar domicilios, medios de contacto y operatividad real en el terreno.
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -87,18 +144,21 @@ if login():
         else:
             df_final = df_base
 
-        # BOTÓN DE DESCARGA (Exportar a Excel/CSV)
-        csv_data = convert_df_to_csv(df_final)
-        st.download_button(
-            label="📥 Exportar Resultados Filtrados (Excel)",
-            data=csv_data,
-            file_name='Reporte_Inteligencia_4879.csv',
-            mime='text/csv',
-        )
-        st.markdown("---") # Línea divisoria
+        # BOTÓN DE DESCARGA PDF
+        if not df_final.empty:
+            pdf_bytes = generar_pdf(df_final)
+            st.download_button(
+                label="📄 Descargar Reporte Estructurado (PDF)",
+                data=pdf_bytes,
+                file_name="Reporte_Inteligencia_4879.pdf",
+                mime="application/pdf"
+            )
+        else:
+            st.warning("No hay resultados para exportar con los filtros actuales.")
+            
+        st.markdown("---")
 
-        # PESTAÑAS
-        tab_m, tab_g = st.tabs(["📍 MAPA OPERATIVO", "🏢 ÍNDICE DE EMPRESAS (22)"])
+        tab_m, tab_g = st.tabs(["📍 MAPA OPERATIVO", "🏢 ÍNDICE DE EMPRESAS"])
 
         with tab_m:
             df_map = df_final.dropna(subset=['latitude', 'longitude'])
